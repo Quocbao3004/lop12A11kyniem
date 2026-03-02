@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>12A11 - Gia Đình Thứ 2</title>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { min-height: 100vh; display: flex; justify-content: center; align-items: center; background: #DB7093; color: white; padding: 10px; }
+        .container { background: rgba(48, 25, 52, 0.95); padding: 25px; border-radius: 28px; color: #DEB887; backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); width: 100%; max-width: 480px; text-align: center; box-shadow: 0 25px 50px rgba(0,0,0,0.4); }
+        .countdown-container { color: #fff; background: linear-gradient(135deg, #FF00FF, #800080); margin: 15px 0; padding: 15px; border-radius: 18px; display: flex; justify-content: space-around; }
+        .time-box span { display: block; font-size: 22px; font-weight: 800; }
+        .grid-menu { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .card { background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 18px; border: 1px solid #FF5733; cursor: pointer; transition: 0.3s; text-align: left; }
+        .card:hover { transform: translateY(-3px); background: rgba(255, 255, 255, 0.1); border-color: #60a5fa; }
+        #details-panel { display: none; margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 15px; border: 1px solid #334155; text-align: left; animation: fadeIn 0.4s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        #chat-box { height: 200px; overflow-y: auto; background: #0f172a; padding: 10px; border-radius: 10px; font-size: 13px; border: 1px solid #334155; }
+        .msg-item { margin-bottom: 8px; padding: 8px; border-radius: 8px; background: rgba(59, 130, 246, 0.1); position: relative; color: #fff; border-left: 3px solid #60a5fa; }
+        .btn-del-msg { position: absolute; top: 5px; right: 8px; color: #ef4444; cursor: pointer; border: none; background: none; font-weight: bold; }
+        #photo-gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: 300px; overflow-y: auto; margin-top: 10px; }
+        .photo-box { position: relative; aspect-ratio: 1/1; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); }
+        .photo-box img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
+        .btn-del-img { position: absolute; top: 5px; right: 5px; background: rgba(239, 68, 68, 0.8); color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 12px; }
+        input[type="text"] { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: white; outline: none; }
+        .btn-send { padding: 10px 20px; border-radius: 10px; background: #D2691E; color: white; border: none; cursor: pointer; font-weight: bold; }
+        #photo-input { display: none; }
+        .upload-label { background: #D2691E; padding: 12px; border-radius: 10px; cursor: pointer; display: block; text-align: center; margin-bottom: 15px; font-size: 13px; font-weight: bold; color: white; }
+    </style>
+</head>
+<body onload="initPage()">
+
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 10px;">
+            <span style="background:#10b981; padding:2px 10px; border-radius:10px; color: white;">FAMILY 12A11</span>
+            <span id="date-now"></span>
+        </div>
+        <h3 style="text-align: left;">🎓 12A11: Ngôi Nhà Chung</h3>
+
+        <div class="countdown-container">
+            <div class="time-box"><span id="days">00</span><label>Ngày</label></div>
+            <div class="time-box"><span id="hours">00</span><label>Giờ</label></div>
+            <div class="time-box"><span id="mins">00</span><label>Phút</label></div>
+            <div class="time-box"><span id="secs">00</span><label>Giây</label></div>
+        </div>
+
+        <div class="grid-menu">
+            <div class="card" onclick="showContent('thanhvien')"><h4>👥 Thành viên</h4><p>Danh sách lớp</p></div>
+            <div class="card" onclick="showContent('khode')"><h4>📚 Kho Đề</h4><p>Tài liệu ôn tập</p></div>
+            <div class="card" onclick="showContent('chat')"><h4>💬 Lời Chúc</h4><p>Nhắn & Xóa chung</p></div>
+            <div class="card" onclick="showContent('kyniem')"><h4>🎞 Kỷ Niệm</h4><p>Album ảnh chung</p></div>
+        </div>
+
+        <div id="details-panel">
+            <h4 id="panel-title" style="margin-bottom:10px; color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:5px;">Chi tiết</h4>
+            <div id="panel-body"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- CẤU HÌNH FIREBASE ĐÃ SỬA LỖI ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyADCTw2oPdCmX30Ezuu-bbTKG2mQNd9MZI",
+            authDomain: "lop12a11-65402.firebaseapp.com",
+            projectId: "lop12a11-65402",
+            storageBucket: "lop12a11-65402.firebasestorage.app",
+            messagingSenderId: "200066253923",
+            appId: "1:200066253923:web:1cff3a14cd87f11188a456",
+            databaseURL: "https://lop12a11-65402-default-rtdb.asia-southeast1.firebasedatabase.app/"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        function initPage() {
+            document.getElementById('date-now').innerText = new Date().toLocaleDateString('vi-VN');
+            setInterval(updateCountdown, 1000);
+        }
+
+        function showContent(type) {
+            const panel = document.getElementById('details-panel');
+            const title = document.getElementById('panel-title');
+            const body = document.getElementById('panel-body');
+            panel.style.display = 'block';
+
+            if(type === 'chat') {
+                title.innerText = "💬 LỜI CHÚC TỪ MỌI NGƯỜI";
+                body.innerHTML = `<div id="chat-box">Đang tải tin nhắn...</div><div style="display:flex; gap:5px; margin-top:10px;"><input type="text" id="mI" placeholder="Nhập lời nhắn..." onkeypress="if(event.key==='Enter') sendMsg()"><button class="btn-send" onclick="sendMsg()">Gửi</button></div>`;
+                loadMsgs();
+            } else if(type === 'kyniem') {
+                title.innerText = "🎞 ALBUM KỶ NIỆM CHUNG";
+                body.innerHTML = `<label for="photo-input" class="upload-label">📸 Chọn ảnh để đăng lên</label><input type="file" id="photo-input" accept="image/*" onchange="processUpload(this)"><div id="photo-gallery">Đang tải ảnh...</div>`;
+                renderPhotos();
+            } else if(type === 'thanhvien') {
+                title.innerText = "👥 DANH SÁCH LỚP";
+                body.innerHTML = `<button class="btn-send" style="width:100%" onclick="window.open('https://docs.google.com/spreadsheets/d/14uXtb0jk0q4nkjcRfMNjYZkHd4sXMFoJ0qoQvkX8K3o/edit?usp=sharing')">Mở Google Sheets</button>`;
+            } else if(type === 'khode') {
+                title.innerText = "📚 TÀI LIỆU ÔN THI";
+                body.innerHTML = `<button class="btn-send" style="width:100%" onclick="window.open('https://tailieuonthi.org/')">Vào Kho Đề 2026</button>`;
+            }
+            panel.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function sendMsg() {
+            const input = document.getElementById('mI');
+            const text = input.value.trim();
+            if(!text) return;
+            db.ref('messages').push({ text: text, time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}), timestamp: Date.now() });
+            input.value = "";
+        }
+
+        function loadMsgs() {
+            const box = document.getElementById('chat-box');
+            db.ref('messages').on('value', (snap) => {
+                const data = snap.val();
+                if(data) {
+                    box.innerHTML = Object.entries(data).map(([key, m]) => `<div class="msg-item"><b>[${m.time}]:</b><br>${m.text}<button class="btn-del-msg" onclick="deleteItem('messages/${key}')">✕</button></div>`).join('');
+                    box.scrollTop = box.scrollHeight;
+                } else box.innerHTML = "Chưa có lời chúc nào...";
+            });
+        }
+
+        function processUpload(input) {
+            const file = input.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 400;
+                    canvas.width = MAX_WIDTH;
+                    canvas.height = img.height * (MAX_WIDTH / img.width);
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    db.ref('memories').push({ src: canvas.toDataURL('image/jpeg', 0.6), timestamp: Date.now() });
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function renderPhotos() {
+            const gallery = document.getElementById('photo-gallery');
+            db.ref('memories').on('value', (snap) => {
+                const data = snap.val();
+                if(data) {
+                    gallery.innerHTML = Object.entries(data).reverse().map(([key, v]) => `<div class="photo-box"><img src="${v.src}" onclick="window.open(this.src)"><button class="btn-del-img" onclick="deleteItem('memories/${key}')">✕</button></div>`).join('');
+                } else gallery.innerHTML = "<p style='grid-column:1/-1;text-align:center;'>Chưa có ảnh nào.</p>";
+            });
+        }
+
+        function deleteItem(path) {
+            if(confirm("Xóa nội dung này cho cả lớp?")) db.ref(path).remove();
+        }
+
+        function updateCountdown() {
+            const gap = new Date("June 26, 2026 07:30:00").getTime() - new Date().getTime();
+            if(gap < 0) return;
+            document.getElementById('days').innerText = Math.floor(gap / 86400000).toString().padStart(2, '0');
+            document.getElementById('hours').innerText = Math.floor((gap % 86400000) / 3600000).toString().padStart(2, '0');
+            document.getElementById('mins').innerText = Math.floor((gap % 3600000) / 60000).toString().padStart(2, '0');
+            document.getElementById('secs').innerText = Math.floor((gap % 60000) / 1000).toString().padStart(2, '0');
+        }
+    </script>
+</body>
+</html>
